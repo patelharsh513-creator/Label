@@ -24,7 +24,9 @@ import {
   Database,
   AlertTriangle,
   Tag,
-  Check
+  Check,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 /**
@@ -51,6 +53,30 @@ const DEFAULT_ALLERGENS = [
   { code: 'O', name: 'Sulphites' },
   { code: 'P', name: 'Lupin' },
   { code: 'R', name: 'Molluscs' },
+];
+
+const DEMO_BUNDLES: Bundle[] = [
+  {
+    id: 'demo-1',
+    name_de: 'Frühstücks-Box Klassik',
+    name_en: 'Breakfast Box Classic',
+    created_at: new Date().toISOString(),
+    items: [
+      { id: 'i1', bundle_id: 'demo-1', item_name_de: 'Buttercroissant', item_name_en: 'Butter Croissant', allergens_de: 'A, C, G', diet_de: 'Vegetarisch', created_at: '' },
+      { id: 'i2', bundle_id: 'demo-1', item_name_de: 'Frischer Obstsalat', item_name_en: 'Fresh Fruit Salad', allergens_de: '', diet_de: 'Vegan', created_at: '' },
+      { id: 'i3', bundle_id: 'demo-1', item_name_de: 'Griechischer Joghurt', item_name_en: 'Greek Yogurt', allergens_de: 'G', diet_de: 'Vegetarisch', created_at: '' }
+    ]
+  },
+  {
+    id: 'demo-2',
+    name_de: 'Bella Italia Lunch',
+    name_en: 'Bella Italia Lunch',
+    created_at: new Date().toISOString(),
+    items: [
+      { id: 'i4', bundle_id: 'demo-2', item_name_de: 'Penne mit Pesto', item_name_en: 'Penne with Pesto', allergens_de: 'A, G, H', diet_de: 'Vegetarisch', created_at: '' },
+      { id: 'i5', bundle_id: 'demo-2', item_name_de: 'Bresaola & Rucola', item_name_en: 'Bresaola & Rocket', allergens_de: '', diet_de: 'Fleisch', created_at: '' }
+    ]
+  }
 ];
 
 const getAllergenFullName = (input: string, legend: { code: string, name: string }[]): string => {
@@ -99,7 +125,8 @@ const TEXT = {
     allergenCode: 'Code (z.B. X)',
     allergenName: 'Name (z.B. Hafer)',
     addAllergen: 'Hinzufügen',
-    selectAllergens: 'Allergene wählen'
+    selectAllergens: 'Allergene wählen',
+    loadDemo: 'Demo Daten laden'
   },
   en: {
     appTitle: 'Bella&Bona Label Generator',
@@ -140,7 +167,8 @@ const TEXT = {
     allergenCode: 'Code (e.g. X)',
     allergenName: 'Name (e.g. Oats)',
     addAllergen: 'Add Allergen',
-    selectAllergens: 'Select Allergens'
+    selectAllergens: 'Select Allergens',
+    loadDemo: 'Load Demo Data'
   }
 };
 
@@ -167,8 +195,8 @@ interface Selection {
   quantity: number;
 }
 
-const DB_KEY = 'bb_label_db_v2';
-const ALLERGEN_KEY = 'bb_allergen_db_v2';
+const DB_KEY = 'bb_label_db_v3';
+const ALLERGEN_KEY = 'bb_allergen_db_v3';
 
 const getInitialData = (): Bundle[] => {
   const saved = localStorage.getItem(DB_KEY);
@@ -362,7 +390,7 @@ const BundleEditor = ({ bundle, allergens, onSave, onCancel, t }: {
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-fade-in">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
           <h2 className="text-xl font-black text-brand-pink uppercase tracking-tight">{bundle ? t.editBundle : t.createNew}</h2>
           <button onClick={onCancel} className="text-slate-500 hover:text-white transition p-2"><X size={24} /></button>
@@ -496,6 +524,10 @@ const App = () => {
     }
   };
 
+  const loadDemoData = () => {
+    setBundles(DEMO_BUNDLES);
+  };
+
   const clearDatabase = () => {
     if (window.confirm(t.confirmClear)) {
       setBundles([]);
@@ -589,16 +621,28 @@ const App = () => {
       renderContainer.appendChild(labelEl);
       const root = createRoot(labelEl);
       root.render(<LabelPreview bundle={bundle} date={packedOn} t={t} lang={lang} allergens={allergens} />);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const canvas = await html2canvas(labelEl, { scale: 2.5, useCORS: true, width: 396.85, height: 561.26, logging: false });
+      
+      // Allow fonts and images to render
+      await new Promise(resolve => setTimeout(resolve, 850));
+      
+      const canvas = await html2canvas(labelEl, { 
+        scale: 2.5, 
+        useCORS: true, 
+        width: 396.85, 
+        height: 561.26, 
+        logging: false 
+      });
+      
       const imgData = canvas.toDataURL('image/png');
       const x = (i % 2) * 105;
       const y = (Math.floor(i / 2) % 2) * 148.5;
+      
       if (i > 0 && i % 4 === 0) pdf.addPage();
       pdf.addImage(imgData, 'PNG', x, y, 105, 148.5);
       renderContainer.removeChild(labelEl);
     }
-    pdf.save(`labels-${packedOn}.pdf`);
+    
+    pdf.save(`BellaBona_Labels_${packedOn}.pdf`);
     setIsGenerating(false);
   };
 
@@ -614,7 +658,7 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-slate-950">
       <div id="pdf-render-container"></div>
       {editingBundle && <BundleEditor allergens={allergens} bundle={editingBundle === 'new' ? undefined : editingBundle} onSave={saveBundle} onCancel={() => setEditingBundle(null)} t={t} />}
       
@@ -623,11 +667,11 @@ const App = () => {
           <div className="brand-pink text-brand-green p-2.5 rounded-2xl shadow-inner"><FileText size={28} strokeWidth={2.5} /></div>
           <div>
             <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Bella<span className="text-brand-pink">&</span>Bona</h1>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Label Engine v2.0</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Label Engine v2.1</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="bg-green-900/50 p-1 rounded-2xl flex">
+          <div className="bg-green-900/30 p-1 rounded-2xl flex border border-green-800/50 backdrop-blur-sm">
             <button onClick={() => setPage('generator')} className={`px-5 py-2 rounded-xl text-sm font-black transition-all duration-300 ${page === 'generator' ? 'brand-pink text-brand-green scale-105 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t.labelGenerator}</button>
             <button onClick={() => setPage('import')} className={`px-5 py-2 rounded-xl text-sm font-black transition-all duration-300 ${page === 'import' ? 'brand-pink text-brand-green scale-105 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t.importData}</button>
           </div>
@@ -638,12 +682,12 @@ const App = () => {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full p-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-8 animate-fade-in">
         {page === 'generator' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-8 space-y-6">
               <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 overflow-hidden">
-                <div className="p-8 border-b border-slate-800 bg-slate-900/50">
+                <div className="p-8 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
                   <div className="flex flex-col md:flex-row gap-6 items-end">
                     <div className="flex-1">
                       <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">{t.packedOn}</label>
@@ -675,7 +719,17 @@ const App = () => {
                       <button onClick={() => addBundleSelection(bundle.id)} className="brand-pink text-brand-green px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-105 transition-all shadow-md active:scale-95">{t.add}</button>
                     </div>
                   ))}
-                  {filteredBundles.length === 0 && <div className="p-20 text-center text-slate-600 font-black uppercase tracking-widest text-sm italic">{t.noBundles}</div>}
+                  {filteredBundles.length === 0 && (
+                    <div className="p-24 text-center">
+                      <div className="mb-6 flex justify-center text-slate-800"><Database size={64} /></div>
+                      <p className="text-slate-600 font-black uppercase tracking-widest text-sm mb-8">{t.noBundles}</p>
+                      {bundles.length === 0 && (
+                        <button onClick={loadDemoData} className="inline-flex items-center gap-2 brand-pink/10 text-brand-pink border border-brand-pink/20 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-pink/20 transition-all">
+                          <Sparkles size={16} /> {t.loadDemo}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -691,7 +745,7 @@ const App = () => {
                     const bundle = bundles.find(b => b.id === sel.bundleId);
                     if (!bundle) return null;
                     return (
-                      <div key={sel.bundleId} className="flex items-center justify-between p-5 bg-slate-800/40 rounded-3xl border border-slate-700/50 group">
+                      <div key={sel.bundleId} className="flex items-center justify-between p-5 bg-slate-800/40 rounded-3xl border border-slate-700/50 group animate-fade-in">
                         <div className="flex-1 min-w-0 pr-4">
                           <p className="font-black text-sm truncate text-slate-200">{lang === 'de' ? bundle.name_de : bundle.name_en}</p>
                           <div className="flex items-center gap-2 mt-3">
@@ -706,8 +760,16 @@ const App = () => {
                   {selections.length === 0 && <div className="p-12 text-center text-slate-700 font-bold text-sm italic opacity-40">{t.noSelected}</div>}
                 </div>
                 <div className="p-8 border-t border-slate-800 bg-slate-900/50">
-                  <button disabled={selections.length === 0 || isGenerating} onClick={generatePDF} className="w-full brand-green text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98]">
-                    {isGenerating ? 'Wait...' : t.generatePdf}
+                  <button 
+                    disabled={selections.length === 0 || isGenerating} 
+                    onClick={generatePDF} 
+                    className="w-full brand-green text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98] relative overflow-hidden"
+                  >
+                    {isGenerating ? (
+                      <span className="flex items-center justify-center gap-3">
+                        <RefreshCw className="animate-spin" size={20} /> Generating...
+                      </span>
+                    ) : t.generatePdf}
                   </button>
                 </div>
               </div>
@@ -774,12 +836,13 @@ const App = () => {
                   <button onClick={clearDatabase} className="w-full mt-10 border border-red-900/20 text-red-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-900/10 transition flex items-center justify-center gap-2"><Trash2 size={14} /> {t.clearDb}</button>
                 </div>
 
-                <div className="bg-brand-green/10 p-10 rounded-[2.5rem] border border-brand-green/20 relative">
-                  <div className="flex items-center gap-4 text-brand-pink mb-6">
+                <div className="bg-brand-green/10 p-10 rounded-[2.5rem] border border-brand-green/20 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 text-brand-green rotate-12"><Croissant size={80} /></div>
+                  <div className="flex items-center gap-4 text-brand-pink mb-6 relative z-10">
                     <AlertTriangle size={28} />
                     <p className="font-black uppercase text-xs tracking-[0.2em]">Pro Tip</p>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-bold italic opacity-80">
+                  <p className="text-xs text-slate-400 leading-relaxed font-bold italic opacity-80 relative z-10">
                     "The bundle system automatically saves your data. Every time you import new data, it is added to the list on the left for easy access."
                   </p>
                 </div>
