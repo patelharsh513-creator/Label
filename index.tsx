@@ -26,7 +26,9 @@ import {
   Tag,
   Check,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Eye,
+  Maximize2
 } from 'lucide-react';
 
 /**
@@ -99,6 +101,7 @@ const TEXT = {
     quantity: 'Anzahl',
     clearAll: 'Alle löschen',
     generatePdf: 'PDF generieren',
+    previewPdf: 'Vorschau',
     importInstructions: 'Format-Anweisungen',
     importRequired: 'Erforderlich',
     importOptional: 'Optional',
@@ -126,7 +129,9 @@ const TEXT = {
     allergenName: 'Name (z.B. Hafer)',
     addAllergen: 'Hinzufügen',
     selectAllergens: 'Allergene wählen',
-    loadDemo: 'Demo Daten laden'
+    loadDemo: 'Demo Daten laden',
+    download: 'Herunterladen',
+    close: 'Schließen'
   },
   en: {
     appTitle: 'Bella&Bona Label Generator',
@@ -141,6 +146,7 @@ const TEXT = {
     quantity: 'Qty',
     clearAll: 'Clear All',
     generatePdf: 'Generate PDF',
+    previewPdf: 'Preview',
     importInstructions: 'Format Instructions',
     importRequired: 'Required',
     importOptional: 'Optional',
@@ -168,7 +174,9 @@ const TEXT = {
     allergenName: 'Name (e.g. Oats)',
     addAllergen: 'Add Allergen',
     selectAllergens: 'Select Allergens',
-    loadDemo: 'Load Demo Data'
+    loadDemo: 'Load Demo Data',
+    download: 'Download',
+    close: 'Close'
   }
 };
 
@@ -471,6 +479,32 @@ const BundleEditor = ({ bundle, allergens, onSave, onCancel, t }: {
   );
 };
 
+const PreviewModal = ({ blobUrl, onClose, onDownload, t }: { blobUrl: string, onClose: () => void, onDownload: () => void, t: any }) => {
+  return (
+    <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[150] flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <div className="brand-pink p-2.5 rounded-2xl"><Eye size={24} className="text-brand-green" /></div>
+            <h2 className="text-xl font-black text-white uppercase tracking-tight">{t.previewPdf}</h2>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={onDownload} className="flex items-center gap-3 brand-green text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:brightness-110 active:scale-[0.98] transition-all">
+              <Download size={18} /> {t.download}
+            </button>
+            <button onClick={onClose} className="p-3 text-slate-500 hover:text-white transition bg-slate-800 rounded-2xl">
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 bg-slate-950 p-6 relative">
+          <iframe src={blobUrl} className="w-full h-full rounded-2xl border border-slate-800 shadow-inner" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
   const [bundles, setBundles] = useState<Bundle[]>(getInitialData);
   const [allergens, setAllergens] = useState<{ code: string, name: string }[]>(getInitialAllergens);
@@ -481,6 +515,7 @@ const App = () => {
   const [selections, setSelections] = useState<Selection[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null | 'new'>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
 
   const [newAllergenCode, setNewAllergenCode] = useState('');
   const [newAllergenName, setNewAllergenName] = useState('');
@@ -489,6 +524,13 @@ const App = () => {
 
   useEffect(() => { localStorage.setItem(DB_KEY, JSON.stringify(bundles)); }, [bundles]);
   useEffect(() => { localStorage.setItem(ALLERGEN_KEY, JSON.stringify(allergens)); }, [allergens]);
+
+  // Cleanup preview URL to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    };
+  }, [previewBlobUrl]);
 
   const filteredBundles = useMemo(() => {
     return bundles.filter(b => 
@@ -602,12 +644,17 @@ const App = () => {
     reader.readAsBinaryString(file);
   };
 
-  const generatePDF = async () => {
+  const generatePDF = async (shouldDownload: boolean = false) => {
     if (selections.length === 0) return;
     setIsGenerating(true);
+    
+    // Revoke previous blob if any
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    
     const { jsPDF } = (window as any).jspdf;
     const html2canvas = (window as any).html2canvas;
     const pdf = new jsPDF('p', 'mm', 'a4');
+    
     const flatLabels: Bundle[] = [];
     selections.forEach(sel => {
       const bundle = bundles.find(b => b.id === sel.bundleId);
@@ -615,6 +662,7 @@ const App = () => {
     });
 
     const renderContainer = document.getElementById('pdf-render-container')!;
+    
     for (let i = 0; i < flatLabels.length; i++) {
       const bundle = flatLabels[i];
       const labelEl = document.createElement('div');
@@ -622,7 +670,7 @@ const App = () => {
       const root = createRoot(labelEl);
       root.render(<LabelPreview bundle={bundle} date={packedOn} t={t} lang={lang} allergens={allergens} />);
       
-      // Allow fonts and images to render
+      // Delay to ensure rendering completes
       await new Promise(resolve => setTimeout(resolve, 850));
       
       const canvas = await html2canvas(labelEl, { 
@@ -642,7 +690,14 @@ const App = () => {
       renderContainer.removeChild(labelEl);
     }
     
-    pdf.save(`BellaBona_Labels_${packedOn}.pdf`);
+    if (shouldDownload) {
+      pdf.save(`BellaBona_Labels_${packedOn}.pdf`);
+    } else {
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPreviewBlobUrl(url);
+    }
+    
     setIsGenerating(false);
   };
 
@@ -660,14 +715,32 @@ const App = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-950">
       <div id="pdf-render-container"></div>
-      {editingBundle && <BundleEditor allergens={allergens} bundle={editingBundle === 'new' ? undefined : editingBundle} onSave={saveBundle} onCancel={() => setEditingBundle(null)} t={t} />}
+      
+      {editingBundle && (
+        <BundleEditor 
+          allergens={allergens} 
+          bundle={editingBundle === 'new' ? undefined : editingBundle} 
+          onSave={saveBundle} 
+          onCancel={() => setEditingBundle(null)} 
+          t={t} 
+        />
+      )}
+
+      {previewBlobUrl && (
+        <PreviewModal 
+          blobUrl={previewBlobUrl} 
+          onClose={() => setPreviewBlobUrl(null)} 
+          onDownload={() => generatePDF(true)}
+          t={t}
+        />
+      )}
       
       <nav className="brand-green text-white px-8 py-5 flex flex-col md:flex-row items-center justify-between shadow-2xl sticky top-0 z-50">
         <div className="flex items-center gap-4 mb-4 md:mb-0">
           <div className="brand-pink text-brand-green p-2.5 rounded-2xl shadow-inner"><FileText size={28} strokeWidth={2.5} /></div>
           <div>
             <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Bella<span className="text-brand-pink">&</span>Bona</h1>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Label Engine v2.1</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Label Engine v2.2</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -759,18 +832,23 @@ const App = () => {
                   })}
                   {selections.length === 0 && <div className="p-12 text-center text-slate-700 font-bold text-sm italic opacity-40">{t.noSelected}</div>}
                 </div>
-                <div className="p-8 border-t border-slate-800 bg-slate-900/50">
-                  <button 
-                    disabled={selections.length === 0 || isGenerating} 
-                    onClick={generatePDF} 
-                    className="w-full brand-green text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98] relative overflow-hidden"
-                  >
-                    {isGenerating ? (
-                      <span className="flex items-center justify-center gap-3">
-                        <RefreshCw className="animate-spin" size={20} /> Generating...
-                      </span>
-                    ) : t.generatePdf}
-                  </button>
+                <div className="p-8 border-t border-slate-800 bg-slate-900/50 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      disabled={selections.length === 0 || isGenerating} 
+                      onClick={() => generatePDF(false)} 
+                      className="flex-1 brand-pink text-brand-green py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98] relative overflow-hidden flex items-center justify-center gap-3"
+                    >
+                      {isGenerating ? <RefreshCw className="animate-spin" size={20} /> : <><Eye size={20} /> {t.previewPdf}</>}
+                    </button>
+                    <button 
+                      disabled={selections.length === 0 || isGenerating} 
+                      onClick={() => generatePDF(true)} 
+                      className="flex-1 brand-green text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98] relative overflow-hidden flex items-center justify-center gap-3"
+                    >
+                      {isGenerating ? <RefreshCw className="animate-spin" size={20} /> : <><Download size={20} /> {t.download}</>}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
