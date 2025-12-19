@@ -10,17 +10,26 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        :root {
+            --brand-green: #024930;
+            --brand-pink: #FEACCF;
+            --footer-bg: #C197AB;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020617;
             color: #f8fafc;
             margin: 0;
             padding: 0;
+            overflow-x: hidden;
         }
-        .brand-pink { background-color: #FEACCF; }
-        .brand-green { background-color: #024930; }
-        .text-brand-green { color: #024930; }
-        .border-brand-green { border-color: #024930; }
+
+        .brand-pink { background-color: var(--brand-pink); }
+        .brand-green { background-color: var(--brand-green); }
+        .text-brand-green { color: var(--brand-green); }
+        .border-brand-green { border-color: var(--brand-green); }
         
         #pdf-render-container {
             position: absolute;
@@ -29,30 +38,30 @@
             width: 105mm;
         }
 
-        ::-webkit-scrollbar {
-            width: 8px;
+        /* Smooth Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
     <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.460.0"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
 </head>
 <body>
     <div id="root"></div>
