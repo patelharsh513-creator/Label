@@ -3,32 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bella&Bona Label Generator</title>
+    <title>Bella&Bona | Label Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         
         :root {
             --brand-green: #024930;
             --brand-pink: #FEACCF;
-            --footer-bg: #C197AB;
+            --brand-muted-pink: #C197AB;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #020617;
-            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
             margin: 0;
             padding: 0;
-            overflow-x: hidden;
         }
 
-        .brand-pink { background-color: var(--brand-pink); }
-        .brand-green { background-color: var(--brand-green); }
+        .bg-brand-green { background-color: var(--brand-green); }
+        .bg-brand-pink { background-color: var(--brand-pink); }
         .text-brand-green { color: var(--brand-green); }
+        .text-brand-pink { color: var(--brand-pink); }
+        .border-brand-green { border-color: var(--brand-green); }
         
         #pdf-render-container {
             position: absolute;
@@ -37,17 +38,21 @@
             width: 105mm;
         }
 
-        /* Smooth Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .label-card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(2, 73, 48, 0.1), 0 8px 10px -6px rgba(2, 73, 48, 0.05);
+        }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
     </style>
     <script type="importmap">
     {
@@ -55,12 +60,13 @@
         "react": "https://esm.sh/react@19.0.0",
         "react-dom": "https://esm.sh/react-dom@19.0.0",
         "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.460.0"
+        "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react"
       }
     }
     </script>
 </head>
 <body>
     <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>
