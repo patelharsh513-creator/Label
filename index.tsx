@@ -23,7 +23,8 @@ import {
   Soup,
   Database,
   AlertTriangle,
-  Tag
+  Tag,
+  Check
 } from 'lucide-react';
 
 /**
@@ -54,7 +55,7 @@ const DEFAULT_ALLERGENS = [
 
 const getAllergenFullName = (input: string, legend: { code: string, name: string }[]): string => {
   const clean = input.trim().toUpperCase();
-  const found = legend.find(a => a.code === clean);
+  const found = legend.find(a => a.code === clean || a.name.toUpperCase() === clean);
   return found ? found.name : input.trim();
 };
 
@@ -80,10 +81,10 @@ const TEXT = {
     allergens: 'Allergene',
     diet: 'Ernährungsform',
     brandName: 'BELLA&BONA',
-    successImport: 'Daten erfolgreich importiert und in der Datenbank gespeichert!',
-    errorImport: 'Fehler beim Importieren der Datei.',
-    noSelected: 'Noch keine Bundles für den Druck ausgewählt.',
-    createNew: 'Neues Bundle erstellen',
+    successImport: 'Daten erfolgreich importiert!',
+    errorImport: 'Fehler beim Importieren.',
+    noSelected: 'Noch keine Bundles ausgewählt.',
+    createNew: 'Neues Bundle',
     editBundle: 'Bundle bearbeiten',
     saveBundle: 'Speichern',
     deleteBundle: 'Löschen',
@@ -91,13 +92,14 @@ const TEXT = {
     bundleName: 'Bundle Name',
     itemName: 'Item Name',
     allergenLegend: 'Allergen-Legende',
-    dbStats: 'Gespeicherte Daten',
-    clearDb: 'Datenbank löschen',
-    confirmClear: 'Sind Sie sicher? Alle gespeicherten Bundles werden gelöscht.',
+    dbStats: 'Datenbank',
+    clearDb: 'Löschen',
+    confirmClear: 'Alle Daten löschen?',
     manageAllergens: 'Allergene Verwalten',
     allergenCode: 'Code (z.B. X)',
     allergenName: 'Name (z.B. Hafer)',
-    addAllergen: 'Allergen hinzufügen'
+    addAllergen: 'Hinzufügen',
+    selectAllergens: 'Allergene wählen'
   },
   en: {
     appTitle: 'Bella&Bona Label Generator',
@@ -120,9 +122,9 @@ const TEXT = {
     allergens: 'Allergens',
     diet: 'Diet Type',
     brandName: 'BELLA&BONA',
-    successImport: 'Data imported and saved to database successfully!',
+    successImport: 'Data imported successfully!',
     errorImport: 'Error importing file.',
-    noSelected: 'No bundles selected for printing yet.',
+    noSelected: 'No bundles selected yet.',
     createNew: 'Create New Bundle',
     editBundle: 'Edit Bundle',
     saveBundle: 'Save Bundle',
@@ -131,13 +133,14 @@ const TEXT = {
     bundleName: 'Bundle Name',
     itemName: 'Item Name',
     allergenLegend: 'Allergen Legend',
-    dbStats: 'Saved Database',
-    clearDb: 'Clear Database',
-    confirmClear: 'Are you sure? All saved bundles will be permanently removed.',
+    dbStats: 'Database',
+    clearDb: 'Clear DB',
+    confirmClear: 'Clear all data?',
     manageAllergens: 'Manage Allergens',
     allergenCode: 'Code (e.g. X)',
     allergenName: 'Name (e.g. Oats)',
-    addAllergen: 'Add Allergen'
+    addAllergen: 'Add Allergen',
+    selectAllergens: 'Select Allergens'
   }
 };
 
@@ -164,8 +167,8 @@ interface Selection {
   quantity: number;
 }
 
-const DB_KEY = 'bb_label_db';
-const ALLERGEN_KEY = 'bb_allergen_db';
+const DB_KEY = 'bb_label_db_v2';
+const ALLERGEN_KEY = 'bb_allergen_db_v2';
 
 const getInitialData = (): Bundle[] => {
   const saved = localStorage.getItem(DB_KEY);
@@ -199,7 +202,7 @@ const WatermarkPattern = () => (
   </div>
 );
 
-const LabelPreview = ({ bundle, date, t, lang, allergens }: { bundle: Bundle, date: string, t: typeof TEXT.de, lang: 'de' | 'en', allergens: { code: string, name: string }[] }) => {
+const LabelPreview = ({ bundle, date, t, lang, allergens }: { bundle: Bundle, date: string, t: any, lang: 'de' | 'en', allergens: { code: string, name: string }[] }) => {
   const dateLocale = lang === 'de' ? 'de-DE' : 'en-GB';
   const itemCount = bundle.items.length;
 
@@ -303,11 +306,12 @@ const LabelPreview = ({ bundle, date, t, lang, allergens }: { bundle: Bundle, da
   );
 };
 
-const BundleEditor = ({ bundle, onSave, onCancel, t }: { 
+const BundleEditor = ({ bundle, allergens, onSave, onCancel, t }: { 
   bundle?: Bundle, 
+  allergens: {code: string, name: string}[],
   onSave: (bundle: Bundle) => void, 
   onCancel: () => void,
-  t: typeof TEXT.en 
+  t: any 
 }) => {
   const [formData, setFormData] = useState<Bundle>(bundle || {
     id: Math.random().toString(36).substr(2, 9),
@@ -343,9 +347,22 @@ const BundleEditor = ({ bundle, onSave, onCancel, t }: {
     }));
   };
 
+  const toggleAllergen = (itemId: string, allergenCode: string) => {
+    const item = formData.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    let current = item.allergens_de.split(',').map(s => s.trim()).filter(Boolean);
+    if (current.includes(allergenCode)) {
+      current = current.filter(c => c !== allergenCode);
+    } else {
+      current.push(allergenCode);
+    }
+    updateItem(itemId, 'allergens_de', current.join(', '));
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
           <h2 className="text-xl font-black text-brand-pink uppercase tracking-tight">{bundle ? t.editBundle : t.createNew}</h2>
           <button onClick={onCancel} className="text-slate-500 hover:text-white transition p-2"><X size={24} /></button>
@@ -361,16 +378,16 @@ const BundleEditor = ({ bundle, onSave, onCancel, t }: {
               <input type="text" value={formData.name_en} onChange={e => setFormData({...formData, name_en: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none"/>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-black text-slate-300 uppercase tracking-widest">{t.addItem}s</h3>
-              <button onClick={addItem} className="flex items-center gap-2 text-xs font-bold brand-pink text-brand-green px-3 py-1.5 rounded-lg transition"><Plus size={14} /> {t.addItem}</button>
+              <button onClick={addItem} className="flex items-center gap-2 text-xs font-bold brand-pink text-brand-green px-4 py-2 rounded-xl transition hover:brightness-110"><Plus size={14} /> {t.addItem}</button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {formData.items.map((item) => (
-                <div key={item.id} className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl relative group">
-                  <button onClick={() => removeItem(item.id)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition"><X size={14} /></button>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div key={item.id} className="bg-slate-800/30 border border-slate-700 p-6 rounded-2xl relative group">
+                  <button onClick={() => removeItem(item.id)} className="absolute top-4 right-4 text-slate-600 hover:text-red-500 transition"><Trash2 size={18} /></button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.itemName} (DE)</label>
                       <input type="text" value={item.item_name_de} onChange={e => updateItem(item.id, 'item_name_de', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"/>
@@ -379,13 +396,37 @@ const BundleEditor = ({ bundle, onSave, onCancel, t }: {
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.itemName} (EN)</label>
                       <input type="text" value={item.item_name_en} onChange={e => updateItem(item.id, 'item_name_en', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"/>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.allergens}</label>
-                      <input type="text" value={item.allergens_de} onChange={e => updateItem(item.id, 'allergens_de', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{t.selectAllergens}</label>
+                      <div className="flex flex-wrap gap-2">
+                        {allergens.map(a => {
+                          const isSelected = item.allergens_de.split(',').map(s => s.trim()).includes(a.code);
+                          return (
+                            <button 
+                              key={a.code} 
+                              onClick={() => toggleAllergen(item.id, a.code)}
+                              className={`px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition ${isSelected ? 'brand-pink text-brand-green' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
+                            >
+                              {isSelected && <Check size={10} />}
+                              {a.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.diet}</label>
-                      <input type="text" value={item.diet_de} onChange={e => updateItem(item.id, 'diet_de', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                      <select 
+                        value={item.diet_de} 
+                        onChange={e => updateItem(item.id, 'diet_de', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">None</option>
+                        <option value="Vegetarisch">Vegetarisch</option>
+                        <option value="Vegan">Vegan</option>
+                        <option value="Fleisch">Meat / Fleisch</option>
+                        <option value="Fisch">Fish / Fisch</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -395,7 +436,7 @@ const BundleEditor = ({ bundle, onSave, onCancel, t }: {
         </div>
         <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-4">
           <button onClick={onCancel} className="px-6 py-3 text-slate-400 font-bold">Cancel</button>
-          <button onClick={() => onSave(formData)} className="brand-pink text-brand-green px-8 py-3 rounded-xl font-black shadow-lg">Save Bundle</button>
+          <button onClick={() => onSave(formData)} className="brand-pink text-brand-green px-10 py-3 rounded-xl font-black shadow-lg hover:brightness-110">Save Bundle</button>
         </div>
       </div>
     </div>
@@ -413,20 +454,22 @@ const App = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null | 'new'>(null);
 
-  // Allergen form state
   const [newAllergenCode, setNewAllergenCode] = useState('');
   const [newAllergenName, setNewAllergenName] = useState('');
 
-  const t = TEXT[lang];
+  const t = (TEXT as any)[lang];
 
   useEffect(() => { localStorage.setItem(DB_KEY, JSON.stringify(bundles)); }, [bundles]);
   useEffect(() => { localStorage.setItem(ALLERGEN_KEY, JSON.stringify(allergens)); }, [allergens]);
 
   const filteredBundles = useMemo(() => {
-    return bundles.filter(b => b.name_de.toLowerCase().includes(searchTerm.toLowerCase()) || b.name_en.toLowerCase().includes(searchTerm.toLowerCase()));
+    return bundles.filter(b => 
+      b.name_de.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      b.name_en.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   }, [bundles, searchTerm]);
 
-  const addBundle = (id: string, qty: number = 1) => {
+  const addBundleSelection = (id: string, qty: number = 1) => {
     setSelections(prev => {
       const exists = prev.find(s => s.bundleId === id);
       if (exists) return prev;
@@ -436,7 +479,6 @@ const App = () => {
 
   const removeSelection = (id: string) => setSelections(prev => prev.filter(s => s.bundleId !== id));
   const updateQuantity = (id: string, qty: number) => setSelections(prev => prev.map(s => s.bundleId === id ? { ...s, quantity: Math.max(1, qty) } : s));
-  const clearSelections = () => setSelections([]);
 
   const saveBundle = (updatedBundle: Bundle) => {
     setBundles(prev => {
@@ -448,8 +490,10 @@ const App = () => {
   };
 
   const deleteBundle = (id: string) => {
-    setBundles(prev => prev.filter(b => b.id !== id));
-    setSelections(prev => prev.filter(s => s.bundleId !== id));
+    if (window.confirm("Delete this bundle?")) {
+      setBundles(prev => prev.filter(b => b.id !== id));
+      setSelections(prev => prev.filter(s => s.bundleId !== id));
+    }
   };
 
   const clearDatabase = () => {
@@ -472,58 +516,41 @@ const App = () => {
       try {
         const XLSX = (window as any).XLSX;
         const workbook = XLSX.read(data, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (jsonData.length === 0) return;
 
         const bundleMap = new Map<string, Bundle>();
-        const selectionMap = new Map<string, {qty: number, date: string}>();
-
         jsonData.forEach(row => {
-          const normalizedRow: any = {};
-          Object.keys(row).forEach(k => normalizedRow[k.toLowerCase().trim()] = row[k]);
+          const norm: any = {};
+          Object.keys(row).forEach(k => norm[k.toLowerCase().trim()] = row[k]);
+          const bName = norm.bundle_name_de;
+          if (!bName) return;
 
-          const bundleNameDe = normalizedRow.bundle_name_de;
-          if (!bundleNameDe) return;
-
-          let bundle = bundleMap.get(bundleNameDe) || bundles.find(b => b.name_de === bundleNameDe);
-          
+          let bundle = bundleMap.get(bName);
           if (!bundle) {
             bundle = {
               id: Math.random().toString(36).substr(2, 9),
-              name_de: bundleNameDe,
-              name_en: normalizedRow.bundle_name_en || bundleNameDe,
+              name_de: bName,
+              name_en: norm.bundle_name_en || bName,
               created_at: new Date().toISOString(),
               items: []
             };
-            bundleMap.set(bundleNameDe, bundle);
-          } else {
-            if (!bundleMap.has(bundleNameDe)) {
-               bundle = { ...bundle, items: [] }; 
-               bundleMap.set(bundleNameDe, bundle);
-            }
+            bundleMap.set(bName, bundle);
           }
-
-          const qty = parseInt(normalizedRow.quantity);
-          if (!isNaN(qty) && qty > 0) {
-            selectionMap.set(bundle.id, { qty: qty, date: normalizedRow.packed_on || "" });
-          }
-
           bundle.items.push({
             id: Math.random().toString(36).substr(2, 9),
             bundle_id: bundle.id,
-            item_name_de: normalizedRow.item_name_de || "",
-            item_name_en: normalizedRow.item_name_en || "",
-            allergens_de: String(normalizedRow.allergens_de || ""),
-            diet_de: normalizedRow.diet_de || "",
+            item_name_de: norm.item_name_de || "",
+            item_name_en: norm.item_name_en || "",
+            allergens_de: String(norm.allergens_de || ""),
+            diet_de: norm.diet_de || "",
             created_at: new Date().toISOString()
           });
         });
 
         const newBundlesList = Array.from(bundleMap.values());
-        
         setBundles(prev => {
           const updated = [...prev];
           newBundlesList.forEach(nb => {
@@ -534,21 +561,9 @@ const App = () => {
           return updated;
         });
 
-        selectionMap.forEach((val, bId) => {
-          addBundle(bId, val.qty);
-          if (val.date && typeof val.date === 'string' && val.date.includes('.')) {
-            const parts = val.date.split('.');
-            if (parts.length === 3) {
-              const [d, m, y] = parts;
-              setPackedOn(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
-            }
-          }
-        });
-
         alert(t.successImport);
         setPage('generator');
       } catch (err) {
-        console.error(err);
         alert(t.errorImport);
       }
     };
@@ -566,17 +581,15 @@ const App = () => {
       const bundle = bundles.find(b => b.id === sel.bundleId);
       if (bundle) for (let i = 0; i < sel.quantity; i++) flatLabels.push(bundle);
     });
-    const renderContainer = document.createElement('div');
-    renderContainer.id = 'pdf-render-container';
-    document.body.appendChild(renderContainer);
 
+    const renderContainer = document.getElementById('pdf-render-container')!;
     for (let i = 0; i < flatLabels.length; i++) {
       const bundle = flatLabels[i];
       const labelEl = document.createElement('div');
       renderContainer.appendChild(labelEl);
       const root = createRoot(labelEl);
       root.render(<LabelPreview bundle={bundle} date={packedOn} t={t} lang={lang} allergens={allergens} />);
-      await new Promise(resolve => setTimeout(resolve, 850));
+      await new Promise(resolve => setTimeout(resolve, 800));
       const canvas = await html2canvas(labelEl, { scale: 2.5, useCORS: true, width: 396.85, height: 561.26, logging: false });
       const imgData = canvas.toDataURL('image/png');
       const x = (i % 2) * 105;
@@ -585,208 +598,188 @@ const App = () => {
       pdf.addImage(imgData, 'PNG', x, y, 105, 148.5);
       renderContainer.removeChild(labelEl);
     }
-    document.body.removeChild(renderContainer);
-    pdf.save(`labels-${packedOn.split('-').reverse().join('-')}.pdf`);
+    pdf.save(`labels-${packedOn}.pdf`);
     setIsGenerating(false);
-  };
-
-  const downloadTemplate = () => {
-    const XLSX = (window as any).XLSX;
-    const data = [
-      ["bundle_name_de", "bundle_name_en", "item_name_de", "item_name_en", "allergens_de", "diet_de", "quantity", "packed_on"],
-      ["Morning Variety Box", "Morning Variety Box", "Mini Butter Croissant", "Mini Butter Croissant", "Gluten, Egg, Lactose", "Vegetarisch", 1, "19.12.2025"]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Labels");
-    XLSX.writeFile(wb, "bb_import_template.xlsx");
   };
 
   const handleAddAllergen = () => {
     if (!newAllergenCode || !newAllergenName) return;
-    const exists = allergens.find(a => a.code.toUpperCase() === newAllergenCode.toUpperCase());
-    if (exists) {
-      setAllergens(allergens.map(a => a.code.toUpperCase() === newAllergenCode.toUpperCase() ? { ...a, name: newAllergenName } : a));
-    } else {
-      setAllergens([...allergens, { code: newAllergenCode.toUpperCase(), name: newAllergenName }]);
-    }
+    setAllergens(prev => {
+      const exists = prev.find(a => a.code.toUpperCase() === newAllergenCode.toUpperCase());
+      if (exists) return prev.map(a => a.code.toUpperCase() === newAllergenCode.toUpperCase() ? { ...a, name: newAllergenName } : a);
+      return [...prev, { code: newAllergenCode.toUpperCase(), name: newAllergenName }];
+    });
     setNewAllergenCode('');
     setNewAllergenName('');
   };
 
-  const removeAllergen = (code: string) => {
-    setAllergens(allergens.filter(a => a.code !== code));
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
-      {editingBundle && <BundleEditor bundle={editingBundle === 'new' ? undefined : editingBundle} onSave={saveBundle} onCancel={() => setEditingBundle(null)} t={t} />}
-      <nav className="brand-green text-white px-6 py-4 flex flex-col md:flex-row items-center justify-between shadow-xl sticky top-0 z-50">
-        <div className="flex items-center gap-3 mb-4 md:mb-0">
-          <div className="brand-pink text-brand-green p-2 rounded-lg shadow-inner"><FileText size={24} /></div>
-          <h1 className="text-xl font-black tracking-tight uppercase">{t.appTitle}</h1>
+    <div className="min-h-screen flex flex-col">
+      <div id="pdf-render-container"></div>
+      {editingBundle && <BundleEditor allergens={allergens} bundle={editingBundle === 'new' ? undefined : editingBundle} onSave={saveBundle} onCancel={() => setEditingBundle(null)} t={t} />}
+      
+      <nav className="brand-green text-white px-8 py-5 flex flex-col md:flex-row items-center justify-between shadow-2xl sticky top-0 z-50">
+        <div className="flex items-center gap-4 mb-4 md:mb-0">
+          <div className="brand-pink text-brand-green p-2.5 rounded-2xl shadow-inner"><FileText size={28} strokeWidth={2.5} /></div>
+          <div>
+            <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Bella<span className="text-brand-pink">&</span>Bona</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">Label Engine v2.0</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setPage('generator')} className={`px-4 py-2 rounded-full font-medium transition ${page === 'generator' ? 'brand-pink text-brand-green scale-105' : 'hover:bg-green-800'}`}>{t.labelGenerator}</button>
-          <button onClick={() => setPage('import')} className={`px-4 py-2 rounded-full font-medium transition ${page === 'import' ? 'brand-pink text-brand-green scale-105' : 'hover:bg-green-800'}`}>{t.importData}</button>
-          <div className="ml-4 flex items-center bg-green-900 rounded-full p-1">
-             <button onClick={() => setLang('de')} className={`px-2 py-1 text-xs rounded-full transition ${lang === 'de' ? 'bg-white text-black font-bold' : 'text-white'}`}>DE</button>
-             <button onClick={() => setLang('en')} className={`px-2 py-1 text-xs rounded-full transition ${lang === 'en' ? 'bg-white text-black font-bold' : 'text-white'}`}>EN</button>
+        <div className="flex items-center gap-3">
+          <div className="bg-green-900/50 p-1 rounded-2xl flex">
+            <button onClick={() => setPage('generator')} className={`px-5 py-2 rounded-xl text-sm font-black transition-all duration-300 ${page === 'generator' ? 'brand-pink text-brand-green scale-105 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t.labelGenerator}</button>
+            <button onClick={() => setPage('import')} className={`px-5 py-2 rounded-xl text-sm font-black transition-all duration-300 ${page === 'import' ? 'brand-pink text-brand-green scale-105 shadow-lg' : 'text-slate-400 hover:text-white'}`}>{t.importData}</button>
+          </div>
+          <div className="ml-4 flex items-center bg-slate-800 p-1 rounded-full border border-slate-700">
+             <button onClick={() => setLang('de')} className={`px-3 py-1.5 text-xs rounded-full transition ${lang === 'de' ? 'bg-white text-black font-black' : 'text-slate-500'}`}>DE</button>
+             <button onClick={() => setLang('en')} className={`px-3 py-1.5 text-xs rounded-full transition ${lang === 'en' ? 'bg-white text-black font-black' : 'text-slate-500'}`}>EN</button>
           </div>
         </div>
       </nav>
-      <main className="flex-1 max-w-7xl mx-auto w-full p-6">
+
+      <main className="flex-1 max-w-7xl mx-auto w-full p-8">
         {page === 'generator' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8">
-              <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden">
-                <div className="p-6 border-b border-slate-800 bg-slate-900/50">
-                  <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 overflow-hidden">
+                <div className="p-8 border-b border-slate-800 bg-slate-900/50">
+                  <div className="flex flex-col md:flex-row gap-6 items-end">
                     <div className="flex-1">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.packedOn}</label>
-                      <input type="date" value={packedOn} onChange={(e) => setPackedOn(e.target.value)} className="w-full pl-4 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"/>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">{t.packedOn}</label>
+                      <input type="date" value={packedOn} onChange={(e) => setPackedOn(e.target.value)} className="w-full pl-6 pr-6 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-white outline-none focus:border-brand-pink transition-all font-bold"/>
                     </div>
-                    <div className="flex-[2]">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t.searchPlaceholder}</label>
-                      <input type="text" placeholder={t.searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-4 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"/>
+                    <div className="flex-[2] relative">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">{t.searchPlaceholder}</label>
+                      <div className="relative">
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <input type="text" placeholder={t.searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-14 pr-6 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-white outline-none focus:border-brand-pink transition-all font-bold"/>
+                      </div>
                     </div>
-                    <button onClick={() => setEditingBundle('new')} className="bg-brand-green text-white p-3 rounded-xl hover:brightness-110 shadow-lg"><PlusCircle size={24} /></button>
+                    <button onClick={() => setEditingBundle('new')} className="brand-green text-white p-4 rounded-2xl hover:brightness-110 shadow-xl transition-all active:scale-95"><PlusCircle size={24} /></button>
                   </div>
                 </div>
-                <div className="divide-y divide-slate-800 h-[600px] overflow-y-auto">
+                <div className="divide-y divide-slate-800/50 h-[600px] overflow-y-auto">
                   {filteredBundles.map(bundle => (
-                    <div key={bundle.id} className="p-4 hover:bg-slate-800/50 transition flex items-center justify-between group">
+                    <div key={bundle.id} className="p-6 hover:bg-slate-800/30 transition-all flex items-center justify-between group">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-bold text-brand-pink text-lg">{lang === 'de' ? bundle.name_de : bundle.name_en}</h3>
-                          <Edit2 size={16} className="text-slate-500 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingBundle(bundle)}/>
+                        <div className="flex items-center gap-4">
+                          <h3 className="font-black text-slate-100 text-xl tracking-tight">{lang === 'de' ? bundle.name_de : bundle.name_en}</h3>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button onClick={() => setEditingBundle(bundle)} className="p-2 bg-slate-700 rounded-xl text-slate-300 hover:text-white hover:bg-slate-600 transition-all"><Edit2 size={14} /></button>
+                            <button onClick={() => deleteBundle(bundle.id)} className="p-2 bg-red-900/20 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-900/40 transition-all"><Trash2 size={14} /></button>
+                          </div>
                         </div>
-                        <p className="text-sm text-slate-400 italic">{lang === 'de' ? bundle.name_en : bundle.name_de}</p>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1 opacity-60">{lang === 'de' ? bundle.name_en : bundle.name_de}</p>
                       </div>
-                      <button onClick={() => addBundle(bundle.id)} className="brand-pink text-brand-green px-4 py-2 rounded-xl font-bold">{t.add}</button>
+                      <button onClick={() => addBundleSelection(bundle.id)} className="brand-pink text-brand-green px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-105 transition-all shadow-md active:scale-95">{t.add}</button>
                     </div>
                   ))}
-                  {filteredBundles.length === 0 && <div className="p-12 text-center text-slate-500 font-medium italic">{t.noBundles}</div>}
+                  {filteredBundles.length === 0 && <div className="p-20 text-center text-slate-600 font-black uppercase tracking-widest text-sm italic">{t.noBundles}</div>}
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-4">
-              <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 flex flex-col h-full max-h-[760px]">
-                <div className="p-6 border-b border-slate-800 flex justify-between items-center"><h2 className="font-bold text-slate-100 uppercase text-sm">{t.selectedBundles}</h2></div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            <div className="lg:col-span-4 flex flex-col">
+              <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 flex flex-col h-full sticky top-32 max-h-[760px]">
+                <div className="p-8 border-b border-slate-800 flex justify-between items-center">
+                  <h2 className="font-black text-brand-pink uppercase text-xs tracking-[0.2em]">{t.selectedBundles}</h2>
+                  <span className="bg-slate-800 text-slate-400 px-3 py-1 rounded-full text-[10px] font-black">{selections.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   {selections.map(sel => {
                     const bundle = bundles.find(b => b.id === sel.bundleId);
                     if (!bundle) return null;
                     return (
-                      <div key={sel.bundleId} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                      <div key={sel.bundleId} className="flex items-center justify-between p-5 bg-slate-800/40 rounded-3xl border border-slate-700/50 group">
                         <div className="flex-1 min-w-0 pr-4">
-                          <p className="font-bold text-sm truncate">{lang === 'de' ? bundle.name_de : bundle.name_en}</p>
-                          <input type="number" value={sel.quantity} onChange={(e) => updateQuantity(sel.bundleId, parseInt(e.target.value) || 1)} className="w-16 bg-slate-700 border border-slate-600 rounded mt-2 text-center text-sm"/>
+                          <p className="font-black text-sm truncate text-slate-200">{lang === 'de' ? bundle.name_de : bundle.name_en}</p>
+                          <div className="flex items-center gap-2 mt-3">
+                             <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Qty:</label>
+                             <input type="number" value={sel.quantity} onChange={(e) => updateQuantity(sel.bundleId, parseInt(e.target.value) || 1)} className="w-16 bg-slate-900 border border-slate-700 rounded-xl text-center text-sm font-black py-1 text-brand-pink"/>
+                          </div>
                         </div>
-                        <X size={20} className="text-slate-500 cursor-pointer" onClick={() => removeSelection(sel.bundleId)}/>
+                        <button onClick={() => removeSelection(sel.bundleId)} className="text-slate-700 group-hover:text-red-500 transition-colors p-2"><X size={20} /></button>
                       </div>
                     );
                   })}
-                  {selections.length === 0 && <div className="p-8 text-center text-slate-600 text-sm italic">{t.noSelected}</div>}
+                  {selections.length === 0 && <div className="p-12 text-center text-slate-700 font-bold text-sm italic opacity-40">{t.noSelected}</div>}
                 </div>
-                <div className="p-6 border-t border-slate-800">
-                  <button disabled={selections.length === 0 || isGenerating} onClick={generatePDF} className="w-full brand-green text-white py-4 rounded-2xl font-black text-lg disabled:opacity-30">{isGenerating ? 'Generating...' : t.generatePdf}</button>
+                <div className="p-8 border-t border-slate-800 bg-slate-900/50">
+                  <button disabled={selections.length === 0 || isGenerating} onClick={generatePDF} className="w-full brand-green text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-20 shadow-2xl hover:brightness-110 transition-all active:scale-[0.98]">
+                    {isGenerating ? 'Wait...' : t.generatePdf}
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                {/* Import Section */}
-                <div className="bg-slate-900 rounded-3xl p-10 border border-slate-800 shadow-2xl">
-                  <h2 className="text-3xl font-black text-brand-pink uppercase mb-8">{t.importData}</h2>
-                  <div className="space-y-6">
-                    <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700">
-                      <h3 className="font-bold mb-4 text-slate-100 flex items-center gap-2"><Info size={18} className="text-brand-pink" /> {t.importInstructions}</h3>
-                      <div className="text-xs text-slate-400 space-y-2 font-mono bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                        <p>Mandatory columns in Excel/CSV:</p>
-                        <p className="text-brand-pink break-all">bundle_name_de, bundle_name_en, item_name_de, item_name_en, allergens_de, diet_de, quantity, packed_on</p>
+          <div className="max-w-6xl mx-auto space-y-10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+              <div className="lg:col-span-2 space-y-10">
+                <div className="bg-slate-900 rounded-[3rem] p-12 border border-slate-800 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-2 h-full brand-pink"></div>
+                  <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-10">{t.importData}</h2>
+                  <div className="space-y-8">
+                    <div className="bg-slate-800/30 p-8 rounded-[2rem] border border-slate-800">
+                      <h3 className="font-black mb-6 text-brand-pink flex items-center gap-3 uppercase text-xs tracking-[0.2em]"><Info size={18} /> {t.importInstructions}</h3>
+                      <div className="text-[11px] text-slate-400 space-y-4 font-mono bg-slate-950 p-6 rounded-2xl border border-slate-800">
+                        <p className="opacity-50 tracking-widest">EXPECTED COLUMNS:</p>
+                        <p className="text-brand-pink break-all leading-relaxed font-bold">bundle_name_de, bundle_name_en, item_name_de, item_name_en, allergens_de, diet_de, quantity, packed_on</p>
                       </div>
-                      <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                        <button onClick={downloadTemplate} className="flex-1 border border-slate-700 py-3 rounded-xl font-bold text-sm hover:bg-slate-700 transition flex items-center justify-center gap-2"><Download size={16} /> {t.downloadTemplate}</button>
-                        <label className="flex-1 brand-pink text-brand-green py-3 rounded-xl font-black text-center cursor-pointer hover:brightness-110 transition flex items-center justify-center gap-2 shadow-lg"><Upload size={18} /> {t.uploadFile} <input type="file" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} className="hidden"/></label>
+                      <div className="mt-10 flex flex-col sm:flex-row gap-5">
+                        <button onClick={handleFileUpload as any} className="flex-1 hidden"><input type="file" id="csv-upload" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} /></button>
+                        <label htmlFor="csv-upload" className="flex-1 brand-pink text-brand-green py-4 rounded-2xl font-black text-center cursor-pointer hover:brightness-110 transition shadow-xl flex items-center justify-center gap-3 uppercase text-xs tracking-widest"><Upload size={20} /> {t.uploadFile}</label>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Allergen Management Section */}
-                <div className="bg-slate-900 rounded-3xl p-10 border border-slate-800 shadow-2xl">
-                   <h3 className="font-bold mb-6 text-slate-100 uppercase text-sm tracking-widest flex items-center gap-2"><Tag size={18} className="text-brand-pink" /> {t.manageAllergens}</h3>
-                   
-                   <div className="bg-slate-800/40 p-6 rounded-2xl border border-slate-700 mb-8">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div className="bg-slate-900 rounded-[3rem] p-12 border border-slate-800 shadow-2xl">
+                   <h3 className="font-black mb-10 text-white uppercase text-xs tracking-[0.2em] flex items-center gap-3"><Tag size={20} className="text-brand-pink" /> {t.manageAllergens}</h3>
+                   <div className="bg-slate-800/30 p-8 rounded-[2rem] border border-slate-800 mb-10">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                        <div>
-                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.allergenCode}</label>
-                         <input 
-                           type="text" 
-                           placeholder="X" 
-                           value={newAllergenCode} 
-                           onChange={e => setNewAllergenCode(e.target.value)} 
-                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-brand-pink transition"
-                         />
+                         <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">{t.allergenCode}</label>
+                         <input type="text" placeholder="X" value={newAllergenCode} onChange={e => setNewAllergenCode(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-5 py-3 text-sm text-white font-bold outline-none focus:border-brand-pink"/>
                        </div>
                        <div>
-                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{t.allergenName}</label>
-                         <input 
-                           type="text" 
-                           placeholder="Oats" 
-                           value={newAllergenName} 
-                           onChange={e => setNewAllergenName(e.target.value)} 
-                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-brand-pink transition"
-                         />
+                         <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">{t.allergenName}</label>
+                         <input type="text" placeholder="Special Nut Mix" value={newAllergenName} onChange={e => setNewAllergenName(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-5 py-3 text-sm text-white font-bold outline-none focus:border-brand-pink"/>
                        </div>
                      </div>
-                     <button 
-                       onClick={handleAddAllergen} 
-                       className="w-full py-2.5 rounded-xl brand-pink text-brand-green font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2 hover:brightness-110 transition"
-                     >
-                       <Plus size={14} /> {t.addAllergen}
+                     <button onClick={handleAddAllergen} className="w-full py-4 rounded-2xl brand-pink text-brand-green font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                       <Plus size={16} /> {t.addAllergen}
                      </button>
                    </div>
-
-                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {allergens.map(item => (
-                      <div key={item.code} className="group flex gap-2 items-center bg-slate-800/40 p-2 rounded-lg border border-slate-700/50 hover:border-slate-600 transition relative">
-                        <span className="brand-pink text-brand-green font-black px-1.5 py-0.5 rounded min-w-[24px] text-center text-[10px]">{item.code}</span>
-                        <span className="text-slate-400 font-medium text-[10px] truncate pr-4">{item.name}</span>
-                        <button 
-                          onClick={() => removeAllergen(item.code)} 
-                          className="absolute right-1 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition p-1"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                      <div key={item.code} className="group flex gap-3 items-center bg-slate-800/20 p-3 rounded-2xl border border-slate-800 hover:border-slate-700 transition relative">
+                        <span className="brand-pink text-brand-green font-black px-2 py-1 rounded-xl text-[10px] min-w-[28px] text-center">{item.code}</span>
+                        <span className="text-slate-300 font-bold text-[10px] truncate pr-6">{item.name}</span>
+                        <button onClick={() => setAllergens(allergens.filter(a => a.code !== item.code))} className="absolute right-3 text-slate-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><X size={14} /></button>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-8">
-                {/* Database Stats */}
-                <div className="bg-slate-900 rounded-3xl p-8 border border-slate-800 shadow-2xl">
-                  <h3 className="font-bold mb-6 text-slate-100 uppercase text-xs tracking-widest flex items-center gap-2"><Database size={16} className="text-brand-pink" /> {t.dbStats}</h3>
-                  <div className="bg-slate-800/30 p-6 rounded-2xl text-center space-y-2 border border-slate-800">
-                    <p className="text-4xl font-black text-brand-pink">{bundles.length}</p>
-                    <p className="text-xs text-slate-500 uppercase font-bold tracking-widest">{t.availableBundles}</p>
+              <div className="space-y-10">
+                <div className="bg-slate-900 rounded-[3rem] p-10 border border-slate-800 shadow-2xl">
+                  <h3 className="font-black mb-8 text-white uppercase text-xs tracking-[0.2em] flex items-center gap-3"><Database size={18} className="text-brand-pink" /> {t.dbStats}</h3>
+                  <div className="bg-slate-800/30 p-10 rounded-[2.5rem] text-center space-y-3 border border-slate-800">
+                    <p className="text-6xl font-black text-brand-pink tracking-tighter">{bundles.length}</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">{t.availableBundles}</p>
                   </div>
-                  <button onClick={clearDatabase} className="w-full mt-8 border border-red-900/30 text-red-500 py-3 rounded-xl font-bold text-xs hover:bg-red-900/10 transition flex items-center justify-center gap-2"><Trash2 size={14} /> {t.clearDb}</button>
+                  <button onClick={clearDatabase} className="w-full mt-10 border border-red-900/20 text-red-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-900/10 transition flex items-center justify-center gap-2"><Trash2 size={14} /> {t.clearDb}</button>
                 </div>
 
-                {/* Pro Tip */}
-                <div className="bg-brand-green/20 p-8 rounded-3xl border border-brand-green/30">
-                  <div className="flex items-center gap-3 text-brand-pink mb-4">
-                    <AlertTriangle size={24} />
-                    <p className="font-black uppercase text-sm">Pro Tip</p>
+                <div className="bg-brand-green/10 p-10 rounded-[2.5rem] border border-brand-green/20 relative">
+                  <div className="flex items-center gap-4 text-brand-pink mb-6">
+                    <AlertTriangle size={28} />
+                    <p className="font-black uppercase text-xs tracking-[0.2em]">Pro Tip</p>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed italic">
+                  <p className="text-xs text-slate-400 leading-relaxed font-bold italic opacity-80">
                     "The bundle system automatically saves your data. Every time you import new data, it is added to the list on the left for easy access."
                   </p>
                 </div>
